@@ -18,6 +18,7 @@ use crate::extern_paths::ExternPaths;
 use crate::ident::{match_ident, to_snake, to_upper_camel};
 use crate::message_graph::MessageGraph;
 use crate::Config;
+use crate::Visibility;
 
 #[derive(PartialEq)]
 enum Syntax {
@@ -362,7 +363,11 @@ impl<'a> CodeGenerator<'a> {
         self.buf.push_str("\")]\n");
         self.append_field_attributes(msg_name, field.name());
         self.push_indent();
-        self.buf.push_str("pub ");
+        let pub_modifier = match self.get_field_visibility(msg_name, field.name()) {
+            Visibility::Public => "pub ",
+            Visibility::Private => "",
+        };
+        self.buf.push_str(pub_modifier);
         self.buf.push_str(&to_snake(field.name()));
         self.buf.push_str(": ");
         if repeated {
@@ -425,8 +430,13 @@ impl<'a> CodeGenerator<'a> {
         ));
         self.append_field_attributes(msg_name, field.name());
         self.push_indent();
+        let pub_modifier = match self.get_field_visibility(msg_name, field.name()) {
+            Visibility::Public => "pub ",
+            Visibility::Private => "",
+        };
         self.buf.push_str(&format!(
-            "pub {}: ::std::collections::{}<{}, {}>,\n",
+            "{} {}: ::std::collections::{}<{}, {}>,\n",
+            pub_modifier,
             to_snake(field.name()),
             rust_ty,
             key_ty,
@@ -458,8 +468,13 @@ impl<'a> CodeGenerator<'a> {
         ));
         self.append_field_attributes(fq_message_name, oneof.name());
         self.push_indent();
+        let pub_modifier = match self.get_field_visibility(fq_message_name, oneof.name()) {
+            Visibility::Public => "pub ",
+            Visibility::Private => "",
+        };
         self.buf.push_str(&format!(
-            "pub {}: ::std::option::Option<{}>,\n",
+            "{} {}: ::std::option::Option<{}>,\n",
+            pub_modifier,
             to_snake(oneof.name()),
             name
         ));
@@ -484,7 +499,11 @@ impl<'a> CodeGenerator<'a> {
         let oneof_name = format!("{}.{}", msg_name, oneof.name());
         self.append_type_attributes(&oneof_name);
         self.push_indent();
-        self.buf.push_str("pub enum ");
+        let pub_and_enum = match self.get_field_visibility(msg_name, oneof.name()) {
+            Visibility::Public => "pub enum ",
+            Visibility::Private => "enum ",
+        };
+        self.buf.push_str(pub_and_enum);
         self.buf.push_str(&to_upper_camel(oneof.name()));
         self.buf.push_str(" {\n");
 
@@ -568,7 +587,11 @@ impl<'a> CodeGenerator<'a> {
         self.buf.push_str("#[repr(i32)]\n");
         self.append_type_attributes(&fq_enum_name);
         self.push_indent();
-        self.buf.push_str("pub enum ");
+        let pub_and_name = match self.get_field_visibility(&fq_enum_name, desc.name()) {
+            Visibility::Public => "pub enum ",
+            Visibility::Private => "enum ",
+        };
+        self.buf.push_str(pub_and_name);
         self.buf.push_str(&to_upper_camel(desc.name()));
         self.buf.push_str(" {\n");
 
@@ -791,6 +814,17 @@ impl<'a> CodeGenerator<'a> {
             Type::Message => true,
             _ => self.syntax == Syntax::Proto2,
         }
+    }
+
+    fn get_field_visibility(&mut self, msg_name: &str, field_name: &str) -> Visibility {
+        assert_eq!(b'.', msg_name.as_bytes()[0]);
+        // TODO: this clone is dirty, but expedious.
+        for (matcher, visibility) in self.config.field_visibilities.clone() {
+            if match_ident(&matcher, msg_name, Some(field_name)) {
+                return visibility;
+            }
+        }
+        Visibility::Public
     }
 }
 
