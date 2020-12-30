@@ -16,10 +16,12 @@ test = false
 [features]
 # Support conversion between Timestamp and chrono::DateTime
 chrono-conversions = ["chrono"]
-
+# Derive serde traits for the structs defined in this crate (unless they contain optional fields)
+serde-derive = ["serde"]
 
 [dependencies]
 bytes = "0.5"
 prost = { version = "0.6.1", path = ".." }
 
+serde = { version = "1.0", features = ["derive"], optional = true}
 chrono = { version = "0.4", optional = true }
