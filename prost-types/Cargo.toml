@@ -13,6 +13,13 @@ edition = "2018"
 doctest = false
 test = false
 
+[features]
+# Support conversion between Timestamp and chrono::DateTime
+chrono-conversions = ["chrono"]
+
+
 [dependencies]
 bytes = "0.5"
 prost = { version = "0.6.1", path = ".." }
+
+chrono = { version = "0.4", optional = true }
